@@ -32,7 +32,6 @@ get_localhost_stream (uint16_t port)
       conn_sock, (struct sockaddr *) &server_addr, sizeof (server_addr), -1);
 
    errcode = mongoc_socket_errno (conn_sock);
-   printf ("mongoc_socket_connect returned %d\n", r);
    if (!(r == 0 || ERRNO_IS_AGAIN (errcode))) {
       fprintf (stderr,
                "mongoc_socket_connect unexpected return: "
@@ -54,6 +53,7 @@ main (int argc, char *argv[])
    mongoc_ssl_opt_t ssl_opts = {0};
    mongoc_stream_t *stream, *tls_stream;
    bson_error_t error;
+   kmip_get_request_t *get_request;
    kmip_request_t *msg;
    const uint8_t *msg_data;
    uint32_t msg_len;
@@ -79,34 +79,17 @@ main (int argc, char *argv[])
       abort ();
    }
 
+   get_request = kmip_get_request_new ();
+   kmip_get_request_set_username (get_request, (uint8_t *) "", 0);
+   kmip_get_request_set_password (get_request, (uint8_t *) "", 0);
+   kmip_get_request_set_uid (get_request, (uint8_t *) "2", 1);
    msg = kmip_request_new ();
-   assert (kmip_request_begin_struct (msg, kmip_tag_request_message));
-   assert (kmip_request_begin_struct (msg, kmip_tag_request_header));
-   assert (kmip_request_begin_struct (msg, kmip_tag_protocol_version));
-   assert (kmip_request_add_int (msg, kmip_tag_protocol_version_major, 1));
-   assert (kmip_request_add_int (msg, kmip_tag_protocol_version_minor, 2));
-   assert (kmip_request_end_struct (msg)); /* protocol_version */
-   assert (kmip_request_begin_struct (msg, kmip_tag_authentication));
-   assert (kmip_request_begin_struct (msg, kmip_tag_credential));
-   assert (kmip_request_add_enum (msg,
-                                  kmip_tag_credential_type,
-                                  kmip_credential_type_username_and_password));
-   assert (kmip_request_begin_struct (msg, kmip_tag_credential_value));
-   assert (kmip_request_add_text (msg, kmip_tag_username, (uint8_t *) "", 0));
-   assert (kmip_request_add_text (msg, kmip_tag_password, (uint8_t *) "", 0));
-   assert (kmip_request_end_struct (msg)); /* credential_value */
-   assert (kmip_request_end_struct (msg)); /* credential */
-   assert (kmip_request_end_struct (msg)); /* authentication */
-   assert (kmip_request_add_int (msg, kmip_tag_batch_count, 1));
-   assert (kmip_request_end_struct (msg)); /* request_header */
-   assert (kmip_request_begin_struct (msg, kmip_tag_batch_item));
-   assert (kmip_request_add_enum (msg, kmip_tag_operation, kmip_operation_get));
-   assert (kmip_request_begin_struct (msg, kmip_tag_request_payload));
-   assert (kmip_request_add_text (
-      msg, kmip_tag_unique_identifier, (uint8_t *) "1", 1));
-   assert (kmip_request_end_struct (msg)); /* request_payload */
-   assert (kmip_request_end_struct (msg)); /* batch_item */
-   assert (kmip_request_end_struct (msg)); /* request_message */
+   if (!kmip_get_request_write (get_request, msg)) {
+      fprintf (stderr,
+               "KMIP message generator failed: %s\n",
+               kmip_request_get_error (msg));
+      abort ();
+   }
 
    msg_data = kmip_request_get_data (msg, &msg_len);
    n = mongoc_stream_write (
@@ -137,15 +120,16 @@ main (int argc, char *argv[])
       }
 
       if (!kmip_parser_feed (parser, read_buf, (size_t) n)) {
-         fprintf (stderr, "KMIP parser failed: %s\n",
-                  kmip_parser_get_error (parser));
+         fprintf (
+            stderr, "KMIP parser failed: %s\n", kmip_parser_get_error (parser));
          abort ();
       }
    }
 
    dump = kmip_parser_dump (parser);
    if (!dump) {
-      fprintf (stderr, "kmip_parser_dump failed: %s\n",
+      fprintf (stderr,
+               "kmip_parser_dump failed: %s\n",
                kmip_parser_get_error (parser));
       abort ();
    }
@@ -153,6 +137,8 @@ main (int argc, char *argv[])
    printf ("%s\n", dump);
    free (dump);
    kmip_parser_destroy (parser);
+   kmip_get_request_destroy (get_request);
+   kmip_request_destroy (msg);
 
    return EXIT_SUCCESS;
 }
