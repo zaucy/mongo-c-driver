@@ -842,7 +842,7 @@ mongoc_add_example (find-and-modify TRUE ${PROJECT_SOURCE_DIR}/examples/find-and
 message (STATUS "Searching for kms_message CMake packages")
 find_package (kms_message)
 mongoc_add_example (kms-prototype FALSE ${PROJECT_SOURCE_DIR}/examples/kms-prototype.c)
-target_include_directories (kms-prototype PRIVATE /Users/emptysquare/.virtualenvs/c-driver/install/include/)
+target_include_directories (kms-prototype PRIVATE "${KMS_MESSAGE_INCLUDE_DIR}")
 target_link_libraries (kms-prototype kms_message)
 mongoc_add_example (hello_mongoc TRUE ${PROJECT_SOURCE_DIR}/examples/hello_mongoc.c)
 mongoc_add_example (mongoc-dump TRUE ${PROJECT_SOURCE_DIR}/examples/mongoc-dump.c)
