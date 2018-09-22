@@ -84,7 +84,6 @@ main (int argc, char *argv[])
 
    /* TODO: set these automatically */
    kms_request_add_header_field (request, "Content-Type", "application/x-amz-json-1.1");
-   kms_request_add_header_field (request, "Content-Length", "41");
    kms_request_add_header_field (request, "X-Amz-Target", "TrentService.Encrypt");
 
    /* TODO: connection: close fails signature test */
