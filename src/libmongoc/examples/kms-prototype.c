@@ -60,6 +60,11 @@ main (int argc, char *argv[])
    ssize_t n;
    uint8_t read_buf[512];
 
+   if (argc != 3) {
+      fprintf (stderr, "Usage: %s ACCESS-KEY-ID SECRET-ACCESS-KEY\n", argv[0]);
+      return EXIT_FAILURE;
+   }
+
    memcpy (&ssl_opts, mongoc_ssl_opt_get_default (), sizeof ssl_opts);
    stream = get_stream (443 /* https */);
    tls_stream = mongoc_stream_tls_new_with_hostname (
@@ -74,9 +79,8 @@ main (int argc, char *argv[])
    request = kms_request_new ("POST", "/");
    kms_request_set_region (request, "us-east-1");
    kms_request_set_service (request, "kms");
-   kms_request_set_access_key_id (request, "AKIAJH4UDOWZIG5Y3PKA");
-   kms_request_set_secret_key (request,
-                               "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");
+   kms_request_set_access_key_id (request, argv[1]);
+   kms_request_set_secret_key (request, argv[2]);
 
    /* TODO: set these automatically */
    kms_request_add_header_field (request, "Content-Type", "application/x-amz-json-1.1");
