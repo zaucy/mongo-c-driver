@@ -54,7 +54,6 @@ main (int argc, char *argv[])
    mongoc_stream_t *stream, *tls_stream;
    bson_error_t error;
    kms_request_t *request;
-   const char *body;
    char *sreq;
    size_t sreq_len;
    ssize_t n;
@@ -64,6 +63,9 @@ main (int argc, char *argv[])
       fprintf (stderr, "Usage: %s ACCESS-KEY-ID SECRET-ACCESS-KEY\n", argv[0]);
       return EXIT_FAILURE;
    }
+
+   mongoc_init ();
+   kms_message_init ();
 
    memcpy (&ssl_opts, mongoc_ssl_opt_get_default (), sizeof ssl_opts);
    stream = get_stream (443 /* https */);
@@ -76,24 +78,11 @@ main (int argc, char *argv[])
       abort ();
    }
 
-   request = kms_request_new ("POST", "/");
+   request = kms_encrypt_request_new ("foobar", "alias/1");
    kms_request_set_region (request, "us-east-1");
    kms_request_set_service (request, "kms");
    kms_request_set_access_key_id (request, argv[1]);
    kms_request_set_secret_key (request, argv[2]);
-
-   /* TODO: set these automatically */
-   kms_request_add_header_field (request, "Content-Type", "application/x-amz-json-1.1");
-   kms_request_add_header_field (request, "X-Amz-Target", "TrentService.Encrypt");
-
-   /* TODO: connection: close fails signature test */
-   //kms_request_add_header_field (request, "Connection", "keep-alive");
-   //kms_request_add_header_field (request, "Connection", "close");
-
-   /* TODO: auto base64 encode and decode */
-   body = "{\"Plaintext\": \"Zm9v\", \"KeyId\": \"alias/1\"}";
-   assert (strlen (body) == 41);
-   kms_request_append_payload (request, body, strlen (body));
 
    /* TODO: CRLF endings? */
    sreq = kms_request_get_signed (request);
@@ -134,5 +123,9 @@ main (int argc, char *argv[])
    }
 
    kms_request_destroy (request);
+
+   mongoc_cleanup ();
+   kms_message_cleanup ();
+
    return EXIT_SUCCESS;
 }
