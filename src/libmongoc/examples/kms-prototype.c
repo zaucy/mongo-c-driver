@@ -46,6 +46,59 @@ get_stream (uint16_t port)
    return mongoc_stream_socket_new (conn_sock);
 }
 
+static void
+api_call (kms_request_t *request, mongoc_stream_t *tls_stream)
+{
+   char *sreq;
+   size_t sreq_len;
+   ssize_t n;
+   uint8_t read_buf[512];
+
+   /* TODO: CRLF endings? */
+   sreq = kms_request_get_signed (request);
+   sreq_len = strlen (sreq);
+   printf ("%s\n", sreq);
+
+   n = mongoc_stream_write (tls_stream, sreq, sreq_len, 1000 /* timeout ms */);
+
+   if (n != (ssize_t) sreq_len) {
+      fprintf (stderr,
+               "Only wrote %zd of %zu bytes (errno: %d)\n",
+               n,
+               sreq_len,
+               errno);
+      perror ("");
+      abort ();
+   }
+
+   /* TODO: write a KMS reply parser */
+   while (true) {
+      n = mongoc_stream_read (tls_stream, read_buf, sizeof (read_buf), 1, 1000);
+      if (n < 0) {
+         fprintf (stderr, "Only read %zd bytes (errno: %d)\n", n, errno);
+         perror ("");
+         break;
+         abort ();
+      }
+
+      if (n == 0) {
+         break;
+      }
+
+      fwrite (read_buf, 1, (size_t) n, stdout);
+   }
+}
+
+const char ciphertext_blob[] =
+   "\x01\x02\x02\x00\x78\xf3\x8e\xd8\xd4\xc6\xba\xfb\xa1\xcf\xc1\x1e\x68\xf2"
+   "\xa1\x91\x9e\x36\x4d\x74\xa2\xc4\x9e\x30\x67\x08\x53\x33\x0d\xcd\xe0\xc9"
+   "\x1b\x01\x60\x30\xd4\x73\x9e\x90\x1f\xa7\x43\x55\x84\x26\xf9\xd5\xf0\xb1"
+   "\x00\x00\x00\x64\x30\x62\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x06\xa0"
+   "\x55\x30\x53\x02\x01\x00\x30\x4e\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07"
+   "\x01\x30\x1e\x06\x09\x60\x86\x48\x01\x65\x03\x04\x01\x2e\x30\x11\x04\x0c"
+   "\xa2\xc7\x12\x1c\x25\x38\x0e\xec\x08\x1f\x23\x09\x02\x01\x10\x80\x21\x61"
+   "\x03\xcd\xcb\xe2\xac\x36\x4f\x73\xdb\x1b\x73\x2e\x33\xda\x45\x51\xf4\xcd"
+   "\xc0\xff\xd2\xe1\xb9\xc4\xc2\x0e\xbf\x53\x90\x46\x18\x42";
 
 int
 main (int argc, char *argv[])
@@ -54,10 +107,6 @@ main (int argc, char *argv[])
    mongoc_stream_t *stream, *tls_stream;
    bson_error_t error;
    kms_request_t *request;
-   char *sreq;
-   size_t sreq_len;
-   ssize_t n;
-   uint8_t read_buf[512];
 
    if (argc != 3) {
       fprintf (stderr, "Usage: %s ACCESS-KEY-ID SECRET-ACCESS-KEY\n", argv[0]);
@@ -84,43 +133,20 @@ main (int argc, char *argv[])
    kms_request_set_access_key_id (request, argv[1]);
    kms_request_set_secret_key (request, argv[2]);
 
-   /* TODO: CRLF endings? */
-   sreq = kms_request_get_signed (request);
-   sreq_len = strlen (sreq);
-   printf ("%s\n", sreq);
+   api_call (request, tls_stream);
 
-   n = mongoc_stream_write (
-      tls_stream, sreq, sreq_len, 1000 /* timeout ms */);
+   kms_request_destroy (request);
 
-   if (n != (ssize_t) sreq_len) {
-      fprintf (stderr,
-               "Only wrote %zd of %zu bytes (errno: %d)\n",
-               n,
-               sreq_len,
-               errno);
-      perror ("");
-      abort ();
-   }
+   /* the ciphertext blob from a response to an "Encrypt" API call */
+   /* the output is Base64-encoded, "Zm9vYmFy", which is "foobar" */
+   request = kms_decrypt_request_new ((uint8_t *) ciphertext_blob,
+                                      sizeof (ciphertext_blob) - 1);
+   kms_request_set_region (request, "us-east-1");
+   kms_request_set_service (request, "kms");
+   kms_request_set_access_key_id (request, argv[1]);
+   kms_request_set_secret_key (request, argv[2]);
 
-   /* TODO: write a KMS reply parser */
-   while (true) {
-      n = mongoc_stream_read (tls_stream, read_buf, sizeof (read_buf), 1, 1000);
-      if (n < 0) {
-         fprintf (stderr,
-                  "Only read %zd bytes (errno: %d)\n",
-                  n,
-                  errno);
-         perror ("");
-         break;
-         abort ();
-      }
-
-      if (n == 0) {
-         break;
-      }
-
-      fwrite (read_buf, 1, (size_t) n, stdout);
-   }
+   api_call (request, tls_stream);
 
    kms_request_destroy (request);
 
