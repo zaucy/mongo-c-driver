@@ -47,19 +47,34 @@ get_stream (uint16_t port)
 }
 
 static void
+print_without_carriage_return (uint8_t *buf, ssize_t n)
+{
+   ssize_t i;
+
+   for (i = 0; i < n; i++) {
+      if (buf[i] != '\r') {
+         putchar (buf[i]);
+      }
+   }
+}
+
+static void
 api_call (kms_request_t *request, mongoc_stream_t *tls_stream)
 {
    char *sreq;
    size_t sreq_len;
    ssize_t n;
-   uint8_t read_buf[512];
+   uint8_t read_buf[64];
+   kms_response_parser_t *parser = kms_response_parser_new ();
+   int64_t start;
+   const int32_t timeout_msec = 1000;
 
    /* TODO: CRLF endings? */
    sreq = kms_request_get_signed (request);
    sreq_len = strlen (sreq);
    printf ("%s\n", sreq);
 
-   n = mongoc_stream_write (tls_stream, sreq, sreq_len, 1000 /* timeout ms */);
+   n = mongoc_stream_write (tls_stream, sreq, sreq_len, timeout_msec);
 
    if (n != (ssize_t) sreq_len) {
       fprintf (stderr,
@@ -71,13 +86,18 @@ api_call (kms_request_t *request, mongoc_stream_t *tls_stream)
       abort ();
    }
 
-   /* TODO: write a KMS reply parser */
-   while (true) {
-      n = mongoc_stream_read (tls_stream, read_buf, sizeof (read_buf), 1, 1000);
+   start = bson_get_monotonic_time ();
+   while (kms_response_parser_wants_bytes (parser, sizeof (read_buf))) {
+      if (bson_get_monotonic_time () - start > timeout_msec * 1000) {
+         fprintf (stderr, "Timed out reading response\n");
+         abort ();
+      }
+
+      n = mongoc_stream_read (
+         tls_stream, read_buf, sizeof (read_buf), 1, timeout_msec);
       if (n < 0) {
-         fprintf (stderr, "Only read %zd bytes (errno: %d)\n", n, errno);
+         fprintf (stderr, "Read returned %zd (errno: %d)\n", n, errno);
          perror ("");
-         break;
          abort ();
       }
 
@@ -85,8 +105,11 @@ api_call (kms_request_t *request, mongoc_stream_t *tls_stream)
          break;
       }
 
-      fwrite (read_buf, 1, (size_t) n, stdout);
+      print_without_carriage_return (read_buf, n);
+      kms_response_parser_feed (parser, read_buf, (uint32_t) n);
    }
+
+   kms_response_parser_destroy (parser);
 }
 
 const char ciphertext_blob[] =
@@ -104,6 +127,7 @@ int
 main (int argc, char *argv[])
 {
    mongoc_ssl_opt_t ssl_opts = {0};
+   kms_request_opt_t *request_opt;
    mongoc_stream_t *stream, *tls_stream;
    bson_error_t error;
    kms_request_t *request;
@@ -127,7 +151,9 @@ main (int argc, char *argv[])
       abort ();
    }
 
-   request = kms_encrypt_request_new ("foobar", "alias/1");
+   request_opt = kms_request_opt_new ();
+   kms_request_opt_set_connection_close (request_opt, true);
+   request = kms_encrypt_request_new ("foobar", "alias/1", request_opt);
    kms_request_set_region (request, "us-east-1");
    kms_request_set_service (request, "kms");
    kms_request_set_access_key_id (request, argv[1]);
@@ -137,10 +163,21 @@ main (int argc, char *argv[])
 
    kms_request_destroy (request);
 
+
+   stream = get_stream (443 /* https */);
+   tls_stream = mongoc_stream_tls_new_with_hostname (
+      stream, "kms.us-east-1.amazonaws.com", &ssl_opts, 1 /* client */);
+
+   if (!mongoc_stream_tls_handshake_block (
+          tls_stream, "kms.us-east-1.amazonaws.com", 1000, &error)) {
+      fprintf (stderr, "Error in handshake: %s\n", error.message);
+      abort ();
+   }
+
    /* the ciphertext blob from a response to an "Encrypt" API call */
    /* the output is Base64-encoded, "Zm9vYmFy", which is "foobar" */
-   request = kms_decrypt_request_new ((uint8_t *) ciphertext_blob,
-                                      sizeof (ciphertext_blob) - 1);
+   request = kms_decrypt_request_new (
+      (uint8_t *) ciphertext_blob, sizeof (ciphertext_blob) - 1, request_opt);
    kms_request_set_region (request, "us-east-1");
    kms_request_set_service (request, "kms");
    kms_request_set_access_key_id (request, argv[1]);
