@@ -23,33 +23,52 @@ test_mongoc_client_pool_basic (void)
    mongoc_client_pool_destroy (pool);
 }
 
+static void *
+worker (void *args)
+{
+   mongoc_client_pool_t *pool = args;
+   mongoc_client_t *client;
+   bool ret;
+   bson_t *cmd;
+   bson_t reply;
+   bson_error_t error;
+   for (int i = 0; i < 10; i++) {
+      client = mongoc_client_pool_pop (pool);
+      BSON_ASSERT (client);
+      cmd = BCON_NEW ("ping", BCON_INT32 (1));
+      ret = mongoc_client_command_simple (client,
+                                          "admin",
+                                          cmd,
+                                          NULL /* read prefs */,
+                                          &reply /* reply */,
+                                          &error);
+      BSON_ASSERT (ret);
+      mongoc_client_pool_push (pool, client);
+   }
+   return NULL;
+}
 
 static void
 test_mongoc_client_pool_basic2 (void)
 {
    mongoc_client_pool_t *pool;
-   mongoc_client_t *client;
    mongoc_uri_t *uri;
-   bool ret;
-   bson_t *cmd;
-   bson_error_t error;
-   bson_t reply;
+   int num_threads = 3;
+   pthread_t *threads;
 
-   uri = mongoc_uri_new ("mongodb://127.0.0.1/?maxpoolsize=5");
+   uri = mongoc_uri_new ("mongodb://127.0.0.1/?maxpoolsize=3");
    pool = mongoc_client_pool_new (uri);
-   client = mongoc_client_pool_pop (pool);
-   client = mongoc_client_pool_pop (pool);
-   cmd = BCON_NEW ("ping", BCON_INT32 (1));
-   ret = mongoc_client_command_simple (client,
-                                       "admin",
-                                       cmd,
-                                       NULL /* read prefs */,
-                                       &reply /* reply */,
-                                       &error);
+   for (int i = 0; i < 10; i++) {
+      threads = calloc (num_threads, sizeof (pthread_t));
+      for (int j = 0; j < 3; j++) {
+         pthread_create (&threads[j], NULL, worker, pool);
+      }
 
-   BSON_ASSERT (ret);
-   BSON_ASSERT (client);
-   mongoc_client_pool_push (pool, client);
+      for (int j = 0; j < 3; j++) {
+         pthread_join (threads[j], NULL);
+      }
+      free (threads);
+   }
    mongoc_uri_destroy (uri);
    mongoc_client_pool_destroy (pool);
 }
