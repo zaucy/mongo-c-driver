@@ -26,7 +26,7 @@ again:
       connection_pool->head = connection_pool->head->next;
       bson_free (temp);
    }
-   else if (connection_pool->size < 5) {
+   else if (connection_pool->size < 100) {
       bson_mutex_unlock (&connection_pool->mutex);
       host =
          _mongoc_topology_host_by_id (topology, server_id, error);
