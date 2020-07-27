@@ -27,6 +27,7 @@
 #include "mongoc-topology-private.h"
 #include "mongoc-trace-private.h"
 #include "mongoc-util-private.h"
+#include "mongoc-connection-pool-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "monitor"
@@ -216,7 +217,14 @@ _mongoc_topology_background_monitoring_reconcile (mongoc_topology_t *topology)
    for (i = 0; i < server_descriptions->items_len; i++) {
       mongoc_server_description_t *sd;
 
+      /* create connection pool for server */
       sd = mongoc_set_get_item (server_descriptions, i);
+      if (!mongoc_set_get (topology->connection_pools, sd->id)) {
+         mongoc_connection_pool_t *new_pool = mongoc_connection_pool_new (topology,
+                                                                          sd);
+         mongoc_set_add (topology->connection_pools, sd->id, new_pool);
+      }
+
       _background_monitor_reconcile_server_monitor (topology, sd);
    }
 

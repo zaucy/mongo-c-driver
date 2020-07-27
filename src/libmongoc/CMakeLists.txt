@@ -502,6 +502,7 @@ set (SOURCES ${SOURCES}
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-database.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-error.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-find-and-modify.c
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-connection-pool.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-init.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-gridfs.c
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-gridfs-bucket.c
@@ -582,6 +583,7 @@ set (HEADERS
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-gridfs-file-list.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-handshake.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-host-list.h
+   ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-connection-pool-private.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-init.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-index.h
    ${PROJECT_SOURCE_DIR}/src/mongoc/mongoc-iovec.h

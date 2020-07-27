@@ -48,6 +48,7 @@ struct _mongoc_client_pool_t;
 
 typedef struct _mongoc_topology_t {
    mongoc_topology_description_t description;
+
    /* topology->uri is initialized as a copy of the client/pool's URI.
     * For a "mongodb+srv://" URI, topology->uri is then updated in
     * mongoc_topology_new() after initial seedlist discovery.
@@ -57,6 +58,7 @@ typedef struct _mongoc_topology_t {
    mongoc_uri_t *uri;
    mongoc_topology_scanner_t *scanner;
    bool server_selection_try_once;
+   mongoc_set_t *connection_pools;
 
    int64_t last_scan;
    int64_t local_threshold_msec;
@@ -105,6 +107,11 @@ typedef struct _mongoc_topology_t {
    bson_mutex_t apm_mutex;
 } mongoc_topology_t;
 
+
+void
+mongoc_server_stream_topology_cleanup (mongoc_topology_t *topology
+   , mongoc_server_stream_t *server_stream);
+
 mongoc_topology_t *
 mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded);
 
@@ -123,6 +130,13 @@ bool
 mongoc_topology_compatible (const mongoc_topology_description_t *td,
                             const mongoc_read_prefs_t *read_prefs,
                             bson_error_t *error);
+
+mongoc_server_stream_t *
+mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
+                                  mongoc_ss_optype_t optype,
+                                  mongoc_topology_t *topology,
+                                  mongoc_client_session_t *cs,
+                                  bson_error_t *error);
 
 mongoc_server_description_t *
 mongoc_topology_select (mongoc_topology_t *topology,

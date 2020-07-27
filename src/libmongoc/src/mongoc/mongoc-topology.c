@@ -32,6 +32,7 @@
 #include "mongoc-error-private.h"
 #include "mongoc-topology-background-monitoring-private.h"
 #include "mongoc-read-prefs-private.h"
+#include "mongoc-connection-pool-private.h"
 
 #include "utlist.h"
 
@@ -246,6 +247,9 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
 
    topology = (mongoc_topology_t *) bson_malloc0 (sizeof *topology);
    topology->session_pool = NULL;
+
+   topology->connection_pools = mongoc_set_new (50, NULL, NULL);
+
    heartbeat_default =
       single_threaded ? MONGOC_TOPOLOGY_HEARTBEAT_FREQUENCY_MS_SINGLE_THREADED
                       : MONGOC_TOPOLOGY_HEARTBEAT_FREQUENCY_MS_MULTI_THREADED;
@@ -1182,6 +1186,53 @@ _mongoc_topology_host_by_id (mongoc_topology_t *topology,
 
    return host;
 }
+
+
+
+
+mongoc_server_stream_t *
+mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
+                                  mongoc_ss_optype_t optype,
+                                  mongoc_topology_t *topology,
+                                  mongoc_client_session_t *cs,
+                                  bson_error_t *error)
+{
+   uint32_t server_id;
+   mongoc_server_stream_t *server_stream;
+   mongoc_connection_pool_t *connection_pool;
+   const mongoc_read_prefs_t *prefs_override = read_prefs;
+
+   if (_mongoc_client_session_in_txn (cs)) {
+      prefs_override = cs->txn.opts.read_prefs;
+   }
+
+   TRACE ("%s","selecting server stream");
+   server_id = mongoc_topology_select_server_id (
+      topology, optype, prefs_override, error);
+
+   bson_mutex_lock (&topology->mutex);
+   connection_pool = mongoc_set_get (topology->connection_pools, server_id);
+   bson_mutex_unlock (&topology->mutex);
+
+   server_stream = mongoc_checkout_connection (connection_pool, error);
+
+   return server_stream;
+}
+
+
+void
+mongoc_server_stream_topology_cleanup (mongoc_topology_t *topology
+                                       , mongoc_server_stream_t *server_stream)
+{
+   mongoc_connection_pool_t *connection_pool;
+   bson_mutex_lock (&topology->mutex);
+   connection_pool =
+      mongoc_set_get (topology->connection_pools, server_stream->server_id);
+   mongoc_checkin_connection (connection_pool, server_stream);
+   bson_mutex_unlock (&topology->mutex);
+}
+
+
 
 /*
 

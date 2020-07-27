@@ -1864,8 +1864,18 @@ mongoc_client_command_simple (mongoc_client_t *client,
     * configuration. The generic command method SHOULD allow an optional read
     * preference argument."
     */
-   server_stream =
-      mongoc_cluster_stream_for_reads (cluster, read_prefs, NULL, reply, error);
+   if (client->topology->single_threaded) {
+      server_stream = mongoc_cluster_stream_for_reads (
+         cluster, read_prefs, NULL, reply, error);
+   }
+   else {
+      server_stream = mongoc_topology_stream_for_reads (read_prefs,
+                                                        MONGOC_SS_READ,
+                                                        client->topology,
+                                                        NULL,
+                                                        error);
+
+   }
 
    if (server_stream) {
       ret = _mongoc_client_command_with_stream (
@@ -1876,8 +1886,11 @@ mongoc_client_command_simple (mongoc_client_t *client,
    }
 
    mongoc_cmd_parts_cleanup (&parts);
-   mongoc_server_stream_cleanup (server_stream);
-
+   if (client->topology->single_threaded)
+      mongoc_server_stream_cleanup (server_stream);
+   else {
+      mongoc_server_stream_topology_cleanup (client->topology, server_stream);
+   }
    RETURN (ret);
 }
 

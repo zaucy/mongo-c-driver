@@ -25,6 +25,36 @@ test_mongoc_client_pool_basic (void)
 
 
 static void
+test_mongoc_client_pool_basic2 (void)
+{
+   mongoc_client_pool_t *pool;
+   mongoc_client_t *client;
+   mongoc_uri_t *uri;
+   bool ret;
+   bson_t *cmd;
+   bson_error_t error;
+   bson_t reply;
+
+   uri = mongoc_uri_new ("mongodb://127.0.0.1/?maxpoolsize=5");
+   pool = mongoc_client_pool_new (uri);
+   client = mongoc_client_pool_pop (pool);
+   client = mongoc_client_pool_pop (pool);
+   cmd = BCON_NEW ("ping", BCON_INT32 (1));
+   ret = mongoc_client_command_simple (client,
+                                       "admin",
+                                       cmd,
+                                       NULL /* read prefs */,
+                                       &reply /* reply */,
+                                       &error);
+
+   BSON_ASSERT (ret);
+   BSON_ASSERT (client);
+   mongoc_client_pool_push (pool, client);
+   mongoc_uri_destroy (uri);
+   mongoc_client_pool_destroy (pool);
+}
+
+static void
 test_mongoc_client_pool_try_pop (void)
 {
    mongoc_client_pool_t *pool;
@@ -408,7 +438,9 @@ test_client_pool_create_unused_session (void *context)
 void
 test_client_pool_install (TestSuite *suite)
 {
+
    TestSuite_Add (suite, "/ClientPool/basic", test_mongoc_client_pool_basic);
+   TestSuite_Add (suite, "/ClientPool/basic2", test_mongoc_client_pool_basic2);
    TestSuite_Add (
       suite, "/ClientPool/try_pop", test_mongoc_client_pool_try_pop);
    TestSuite_Add (
