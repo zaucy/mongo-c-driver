@@ -26,7 +26,8 @@ again:
       connection_pool->head = connection_pool->head->next;
       bson_free (temp);
    }
-   else if (connection_pool->size < 100) {
+   else if (connection_pool->size < topology->max_connection_pool_size) {
+      connection_pool->size++;
       bson_mutex_unlock (&connection_pool->mutex);
       host =
          _mongoc_topology_host_by_id (topology, server_id, error);
@@ -34,7 +35,6 @@ again:
       server_stream = mongoc_server_stream_new (&topology->description, sd, stream);
       server_stream->server_id = server_id;
       bson_mutex_lock (&connection_pool->mutex);
-      connection_pool->size++;
    }
    else {
       mongoc_cond_wait (&connection_pool->cond, &connection_pool->mutex);
