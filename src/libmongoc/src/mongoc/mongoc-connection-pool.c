@@ -33,9 +33,8 @@ again:
          _mongoc_topology_host_by_id (topology, server_id, error);
       stream = mongoc_client_connect_tcp (topology->connect_timeout_msec, host, error);
       if (!stream) {
-         bson_mutex_lock (&connection_pool->mutex);
-         connection_pool->size--;
-         goto again;
+         fprintf (stderr, "%s", error->message);
+         abort ();
       }
       server_stream = mongoc_server_stream_new (&topology->description, sd, stream);
       server_stream->server_id = server_id;
