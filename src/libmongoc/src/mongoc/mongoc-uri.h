@@ -47,6 +47,7 @@
 #define MONGOC_URI_LOCALTHRESHOLDMS "localthresholdms"
 #define MONGOC_URI_MAXIDLETIMEMS "maxidletimems"
 #define MONGOC_URI_MAXPOOLSIZE "maxpoolsize"
+#define MONGOC_URI_MAXCONNECTIONPOOLSIZE "maxconnectionpoolsize"
 #define MONGOC_URI_MAXSTALENESSSECONDS "maxstalenessseconds"
 #define MONGOC_URI_MINPOOLSIZE "minpoolsize"
 #define MONGOC_URI_READCONCERNLEVEL "readconcernlevel"

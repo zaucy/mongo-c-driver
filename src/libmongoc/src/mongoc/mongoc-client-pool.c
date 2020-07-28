@@ -147,6 +147,11 @@ mongoc_client_pool_new (const mongoc_uri_t *uri)
          pool->max_pool_size = BSON_MAX (1, bson_iter_int32 (&iter));
       }
    }
+   if (bson_iter_init_find_case (&iter, b, MONGOC_URI_MAXCONNECTIONPOOLSIZE)) {
+      if (BSON_ITER_HOLDS_INT32 (&iter)) {
+         pool->topology->max_connection_pool_size = BSON_MAX (1, bson_iter_int32 (&iter));
+      }
+   }
 
    appname =
       mongoc_uri_get_option_as_utf8 (pool->uri, MONGOC_URI_APPNAME, NULL);

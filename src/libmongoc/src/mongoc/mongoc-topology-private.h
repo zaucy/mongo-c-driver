@@ -59,6 +59,7 @@ typedef struct _mongoc_topology_t {
    mongoc_topology_scanner_t *scanner;
    bool server_selection_try_once;
    mongoc_set_t *connection_pools;
+   uint32_t max_connection_pool_size;
 
    int64_t last_scan;
    int64_t local_threshold_msec;

@@ -730,6 +730,7 @@ mongoc_uri_option_is_int32 (const char *key)
           !strcasecmp (key, MONGOC_URI_SOCKETTIMEOUTMS) ||
           !strcasecmp (key, MONGOC_URI_LOCALTHRESHOLDMS) ||
           !strcasecmp (key, MONGOC_URI_MAXPOOLSIZE) ||
+          !strcasecmp (key, MONGOC_URI_MAXCONNECTIONPOOLSIZE) ||
           !strcasecmp (key, MONGOC_URI_MAXSTALENESSSECONDS) ||
           !strcasecmp (key, MONGOC_URI_MINPOOLSIZE) ||
           !strcasecmp (key, MONGOC_URI_MAXIDLETIMEMS) ||

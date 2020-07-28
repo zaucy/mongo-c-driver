@@ -246,6 +246,7 @@ mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded)
 #endif
 
    topology = (mongoc_topology_t *) bson_malloc0 (sizeof *topology);
+   topology->max_connection_pool_size = 100;
    topology->session_pool = NULL;
 
    topology->connection_pools = mongoc_set_new (50, NULL, NULL);

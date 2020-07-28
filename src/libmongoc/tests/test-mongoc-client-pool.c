@@ -56,7 +56,7 @@ test_mongoc_client_pool_basic2 (void)
    int num_threads = 3;
    pthread_t *threads;
 
-   uri = mongoc_uri_new ("mongodb://127.0.0.1/?maxpoolsize=3");
+   uri = mongoc_uri_new ("mongodb://127.0.0.1/?maxconnectionpoolsize=3");
    pool = mongoc_client_pool_new (uri);
    for (int i = 0; i < 10; i++) {
       threads = calloc (num_threads, sizeof (pthread_t));
