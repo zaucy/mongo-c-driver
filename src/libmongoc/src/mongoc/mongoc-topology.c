@@ -1225,12 +1225,14 @@ void
 mongoc_server_stream_topology_cleanup (mongoc_topology_t *topology
                                        , mongoc_server_stream_t *server_stream)
 {
-   mongoc_connection_pool_t *connection_pool;
-   bson_mutex_lock (&topology->mutex);
-   connection_pool =
-      mongoc_set_get (topology->connection_pools, server_stream->server_id);
-   mongoc_checkin_connection (connection_pool, server_stream);
-   bson_mutex_unlock (&topology->mutex);
+   if (server_stream) {
+      mongoc_connection_pool_t *connection_pool;
+      bson_mutex_lock (&topology->mutex);
+      connection_pool =
+         mongoc_set_get (topology->connection_pools, server_stream->server_id);
+      mongoc_checkin_connection (connection_pool, server_stream);
+      bson_mutex_unlock (&topology->mutex);
+   }
 }
 
 

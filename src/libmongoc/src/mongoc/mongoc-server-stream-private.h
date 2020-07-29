@@ -35,6 +35,7 @@ typedef struct _mongoc_server_stream_t {
    bson_t cluster_time;             /* owned */
    mongoc_stream_t *stream;         /* borrowed */
    uint32_t server_id;
+   uint32_t connection_id;
 } mongoc_server_stream_t;
 
 

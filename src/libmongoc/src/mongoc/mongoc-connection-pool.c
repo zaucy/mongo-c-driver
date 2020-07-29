@@ -20,11 +20,8 @@ mongoc_checkout_connection (mongoc_connection_pool_t *connection_pool,
    sd = mongoc_topology_description_server_by_id (
          &topology->description, server_id, error);
 again:
-   if (connection_pool->head) {
-      mongoc_connection_pool_node_t *temp = connection_pool->head;
-      server_stream = temp->data;
-      connection_pool->head = connection_pool->head->next;
-      bson_free (temp);
+   if (_mongoc_queue_get_length (connection_pool->queue)) {
+      server_stream = _mongoc_queue_pop_head (connection_pool->queue);
    }
    else if (connection_pool->size < topology->max_connection_pool_size) {
       connection_pool->size++;
@@ -33,12 +30,12 @@ again:
          _mongoc_topology_host_by_id (topology, server_id, error);
       stream = mongoc_client_connect_tcp (topology->connect_timeout_msec, host, error);
       if (!stream) {
-         fprintf (stderr, "%s", error->message);
-         abort ();
+         return NULL;
       }
       server_stream = mongoc_server_stream_new (&topology->description, sd, stream);
       server_stream->server_id = server_id;
       bson_mutex_lock (&connection_pool->mutex);
+      server_stream->connection_id = ++connection_pool->max_id;
    }
    else {
       mongoc_cond_wait (&connection_pool->cond, &connection_pool->mutex);
@@ -52,11 +49,8 @@ void
 mongoc_checkin_connection (mongoc_connection_pool_t *connection_pool,
                            mongoc_server_stream_t *server_stream)
 {
-   mongoc_connection_pool_node_t *node = bson_malloc0 (sizeof (mongoc_connection_pool_node_t));
-   node->data = server_stream;
-
    bson_mutex_lock (&connection_pool->mutex);
-   LL_PREPEND (connection_pool->head, node);
+   _mongoc_queue_push_head (connection_pool->queue, server_stream);
    mongoc_cond_signal (&connection_pool->cond);
    bson_mutex_unlock (&connection_pool->mutex);
 }
@@ -68,8 +62,25 @@ mongoc_connection_pool_new (mongoc_topology_t *topology,
    mongoc_connection_pool_t *new_pool =
       bson_malloc0 (sizeof (mongoc_connection_pool_t));
    new_pool->server_id = sd->id;
+   new_pool->max_id = 0;
    new_pool->topology = topology;
    bson_mutex_init (&new_pool->mutex);
    mongoc_cond_init (&new_pool->cond);
+   new_pool->queue = bson_malloc (sizeof (mongoc_queue_t));
+   _mongoc_queue_init (new_pool->queue);
    return new_pool;
 }
+
+bool
+mongoc_connection_pool_close (mongoc_connection_pool_t *pool)
+{
+   mongoc_queue_t *queue = pool->queue;
+   mongoc_server_stream_t *curr;
+   bson_mutex_lock (&pool->mutex);
+   while ((curr = _mongoc_queue_pop_head (queue))) {
+      mongoc_stream_close (curr->stream);
+      mongoc_server_stream_cleanup (curr);
+   }
+   bson_mutex_unlock (&pool->mutex);
+}
+

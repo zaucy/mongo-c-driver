@@ -6,6 +6,7 @@
 
 #include "mongoc-config.h"
 #include "mongoc-topology-private.h"
+#include "mongoc-queue-private.h"
 #include "mongoc-topology-scanner-private.h"
 #include "mongoc-server-description-private.h"
 #include "mongoc-topology-description-private.h"
@@ -16,16 +17,11 @@
 #include "mongoc-client-private.h"
 #include "utlist.h"
 
-
-typedef struct _mongoc_connection_pool_node_t {
-   struct _mongoc_connection_pool_node_t *next;
-   mongoc_server_stream_t *data;
-} mongoc_connection_pool_node_t;
-
 typedef struct _mongoc_connection_pool_t {
    int size;
    int server_id;
-   mongoc_connection_pool_node_t *head;
+   int max_id;
+   mongoc_queue_t *queue;
    bson_mutex_t mutex;
    mongoc_cond_t cond;
    mongoc_topology_t *topology;
@@ -42,6 +38,10 @@ mongoc_checkin_connection (mongoc_connection_pool_t *connection_pool,
 mongoc_connection_pool_t *
 mongoc_connection_pool_new (mongoc_topology_t *topology,
                             mongoc_server_description_t *sd);
+
+
+bool
+mongoc_connection_pool_close (mongoc_connection_pool_t *);
 
 void
 mongoc_connection_pool_destroy (mongoc_connection_pool_t *pool);
