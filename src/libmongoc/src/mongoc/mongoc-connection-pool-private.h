@@ -18,7 +18,9 @@
 #include "utlist.h"
 
 typedef struct _mongoc_connection_pool_t {
-   int size;
+   int total_connections;
+   int available_connections;
+   int generation;
    int server_id;
    int max_id;
    mongoc_queue_t *queue;
@@ -40,7 +42,7 @@ mongoc_connection_pool_new (mongoc_topology_t *topology,
                             mongoc_server_description_t *sd);
 
 
-bool
+void
 mongoc_connection_pool_close (mongoc_connection_pool_t *);
 
 void
