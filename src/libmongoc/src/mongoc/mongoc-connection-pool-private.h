@@ -23,9 +23,9 @@ typedef struct _mongoc_connection_pool_t {
    int generation;
    int server_id;
    int max_id;
+   mongoc_queue_t *cond_queue;
    mongoc_queue_t *queue;
    bson_mutex_t mutex;
-   mongoc_cond_t cond;
    mongoc_topology_t *topology;
 } mongoc_connection_pool_t ;
 

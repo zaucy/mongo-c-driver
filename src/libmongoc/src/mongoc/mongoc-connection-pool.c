@@ -43,7 +43,10 @@ again:
       server_stream->connection_id = ++connection_pool->max_id;
    }
    else {
-      mongoc_cond_wait (&connection_pool->cond, &connection_pool->mutex);
+      mongoc_cond_t new_cond;
+      mongoc_cond_init (&new_cond);
+      _mongoc_queue_push_head (connection_pool->cond_queue, &new_cond);
+      mongoc_cond_wait (&new_cond, &connection_pool->mutex);
       goto again;
    }
    bson_mutex_unlock (&connection_pool->mutex);
@@ -54,10 +57,13 @@ void
 mongoc_checkin_connection (mongoc_connection_pool_t *connection_pool,
                            mongoc_server_stream_t *server_stream)
 {
+   mongoc_cond_t *cond;
    bson_mutex_lock (&connection_pool->mutex);
    connection_pool->available_connections++;
+   cond = _mongoc_queue_pop_tail (connection_pool->cond_queue);
    _mongoc_queue_push_head (connection_pool->queue, server_stream);
-   mongoc_cond_signal (&connection_pool->cond);
+   if (cond)
+      mongoc_cond_signal (cond);
    bson_mutex_unlock (&connection_pool->mutex);
 }
 
@@ -74,9 +80,10 @@ mongoc_connection_pool_new (mongoc_topology_t *topology,
    new_pool->available_connections = 0;
    new_pool->topology = topology;
    bson_mutex_init (&new_pool->mutex);
-   mongoc_cond_init (&new_pool->cond);
    new_pool->queue = bson_malloc (sizeof (mongoc_queue_t));
+   new_pool->cond_queue = bson_malloc (sizeof (mongoc_queue_t));
    _mongoc_queue_init (new_pool->queue);
+   _mongoc_queue_init (new_pool->cond_queue);
    return new_pool;
 }
 
