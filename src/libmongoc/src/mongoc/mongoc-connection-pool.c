@@ -22,6 +22,7 @@ mongoc_checkout_connection (mongoc_connection_pool_t *connection_pool,
 again:
    if (connection_pool->available_connections) {
       server_stream = _mongoc_queue_pop_head (connection_pool->queue);
+      BSON_ASSERT (server_stream);
       connection_pool->available_connections--;
    }
    else if (connection_pool->total_connections < topology->max_connection_pool_size) {
