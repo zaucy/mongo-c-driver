@@ -31,6 +31,7 @@ typedef struct _mongoc_connection_pool_t {
 
 mongoc_server_stream_t *
 mongoc_checkout_connection (mongoc_connection_pool_t *connection_pool,
+                            mongoc_cluster_t *cluster,
                             bson_error_t *error);
 
 void

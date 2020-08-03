@@ -1944,7 +1944,7 @@ _mongoc_cluster_node_dtor (void *data_, void *ctx_)
    _mongoc_cluster_node_destroy (node);
 }
 
-static mongoc_cluster_node_t *
+mongoc_cluster_node_t *
 _mongoc_cluster_node_new (mongoc_stream_t *stream,
                           uint32_t generation,
                           const char *connection_address)
@@ -2052,7 +2052,7 @@ _mongoc_cluster_finish_speculative_auth (mongoc_cluster_t *cluster,
  *
  *--------------------------------------------------------------------------
  */
-static mongoc_stream_t *
+mongoc_stream_t *
 _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
                           uint32_t generation,
                           uint32_t server_id,
@@ -2093,7 +2093,7 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
 
    /* take critical fields from a fresh ismaster */
    cluster_node =
-      _mongoc_cluster_node_new (stream, generation, host->host_and_port);
+   _mongoc_cluster_node_new (stream, generation, host->host_and_port);
 
    sd = _mongoc_cluster_run_ismaster (cluster,
                                       cluster_node,

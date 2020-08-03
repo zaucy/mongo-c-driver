@@ -1873,6 +1873,7 @@ mongoc_client_command_simple (mongoc_client_t *client,
                                                         MONGOC_SS_READ,
                                                         client->topology,
                                                         NULL,
+                                                        client,
                                                         error);
 
    }

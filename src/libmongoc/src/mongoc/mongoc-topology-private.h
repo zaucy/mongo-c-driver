@@ -137,6 +137,7 @@ mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
                                   mongoc_ss_optype_t optype,
                                   mongoc_topology_t *topology,
                                   mongoc_client_session_t *cs,
+                                  mongoc_client_t *client,
                                   bson_error_t *error);
 
 mongoc_server_description_t *

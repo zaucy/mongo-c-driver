@@ -71,6 +71,12 @@ typedef struct _mongoc_cluster_t {
 } mongoc_cluster_t;
 
 
+mongoc_cluster_node_t *
+_mongoc_cluster_node_new (mongoc_stream_t *stream,
+                          uint32_t generation,
+                          const char *connection_address);
+
+
 void
 mongoc_cluster_init (mongoc_cluster_t *cluster,
                      const mongoc_uri_t *uri,
@@ -181,6 +187,14 @@ _mongoc_cluster_get_auth_cmd_x509 (const mongoc_uri_t *uri,
                                    const mongoc_ssl_opt_t *ssl_opts,
                                    bson_t *cmd /* OUT */,
                                    bson_error_t *error /* OUT */);
+
+
+mongoc_stream_t *
+_mongoc_cluster_add_node (mongoc_cluster_t *cluster,
+                          uint32_t generation,
+                          uint32_t server_id,
+                          bson_error_t *error /* OUT */);
+
 
 #ifdef MONGOC_ENABLE_CRYPTO
 void

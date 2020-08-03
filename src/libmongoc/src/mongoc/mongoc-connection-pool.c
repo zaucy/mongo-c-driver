@@ -1,24 +1,25 @@
 #include "mongoc-config.h"
 
 #include "mongoc-connection-pool-private.h"
+#include "mongoc-host-list-private.h"
+
 
 mongoc_server_stream_t *
 mongoc_checkout_connection (mongoc_connection_pool_t *connection_pool,
+                            mongoc_cluster_t *cluster,
                             bson_error_t *error)
 {
    mongoc_stream_t *stream;
    mongoc_topology_t *topology;
    uint32_t server_id;
-   mongoc_host_list_t *host = NULL;
    mongoc_server_stream_t *server_stream;
-   mongoc_server_description_t *sd;
+   uint32_t generation;
 
    bson_mutex_lock (&connection_pool->mutex);
    server_id = connection_pool->server_id;
    topology = connection_pool->topology;
+   generation = connection_pool->generation;
 
-   sd = mongoc_topology_description_server_by_id (
-         &topology->description, server_id, error);
 again:
    if (connection_pool->available_connections) {
       server_stream = _mongoc_queue_pop_head (connection_pool->queue);
@@ -28,9 +29,9 @@ again:
    else if (connection_pool->total_connections < topology->max_connection_pool_size) {
       connection_pool->total_connections++;
       bson_mutex_unlock (&connection_pool->mutex);
-      host =
-         _mongoc_topology_host_by_id (topology, server_id, error);
-      stream = mongoc_client_connect_tcp (topology->connect_timeout_msec, host, error);
+      stream = _mongoc_cluster_add_node (cluster, generation,
+                                             server_id, error);
+
       if (!stream) {
          bson_mutex_lock (&connection_pool->mutex);
          connection_pool->total_connections--;
@@ -38,10 +39,13 @@ again:
          bson_mutex_unlock (&connection_pool->mutex);
          return NULL;
       }
-      server_stream = mongoc_server_stream_new (&topology->description, sd, stream);
+      server_stream = _mongoc_cluster_create_server_stream (topology,
+                                                            server_id,
+                                                            stream, error);
       server_stream->server_id = server_id;
       bson_mutex_lock (&connection_pool->mutex);
       server_stream->connection_id = ++connection_pool->max_id;
+
    }
    else {
       mongoc_cond_t new_cond;

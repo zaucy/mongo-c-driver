@@ -1196,6 +1196,7 @@ mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
                                   mongoc_ss_optype_t optype,
                                   mongoc_topology_t *topology,
                                   mongoc_client_session_t *cs,
+                                  mongoc_client_t *client,
                                   bson_error_t *error)
 {
    uint32_t server_id;
@@ -1215,7 +1216,8 @@ mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
    connection_pool = mongoc_set_get (topology->connection_pools, server_id);
    bson_mutex_unlock (&topology->mutex);
 
-   server_stream = mongoc_checkout_connection (connection_pool, error);
+   server_stream = mongoc_checkout_connection (connection_pool, &client->cluster,
+                                               error);
 
    return server_stream;
 }
