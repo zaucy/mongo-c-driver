@@ -43,6 +43,7 @@ again:
                                                             server_id,
                                                             stream, error);
       server_stream->server_id = server_id;
+      server_stream->connection_pool = connection_pool;
       bson_mutex_lock (&connection_pool->mutex);
       server_stream->connection_id = ++connection_pool->max_id;
 

@@ -36,6 +36,7 @@ typedef struct _mongoc_server_stream_t {
    mongoc_stream_t *stream;         /* borrowed */
    uint32_t server_id;
    uint32_t connection_id;
+   void *connection_pool;
 } mongoc_server_stream_t;
 
 

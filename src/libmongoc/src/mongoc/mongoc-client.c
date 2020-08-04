@@ -1877,7 +1877,7 @@ mongoc_client_command_simple (mongoc_client_t *client,
 
    mongoc_cmd_parts_cleanup (&parts);
 
-   mongoc_server_stream_topology_cleanup (client->topology, server_stream);
+   mongoc_server_stream_cleanup (server_stream);
 
    RETURN (ret);
 }

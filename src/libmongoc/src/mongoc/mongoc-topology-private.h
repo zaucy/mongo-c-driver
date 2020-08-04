@@ -109,10 +109,6 @@ typedef struct _mongoc_topology_t {
 } mongoc_topology_t;
 
 
-void
-mongoc_server_stream_topology_cleanup (mongoc_topology_t *topology
-   , mongoc_server_stream_t *server_stream);
-
 mongoc_topology_t *
 mongoc_topology_new (const mongoc_uri_t *uri, bool single_threaded);
 
@@ -132,13 +128,6 @@ mongoc_topology_compatible (const mongoc_topology_description_t *td,
                             const mongoc_read_prefs_t *read_prefs,
                             bson_error_t *error);
 
-mongoc_server_stream_t *
-mongoc_topology_stream_for_reads (const mongoc_read_prefs_t *read_prefs,
-                                  mongoc_ss_optype_t optype,
-                                  mongoc_topology_t *topology,
-                                  mongoc_client_session_t *cs,
-                                  mongoc_client_t *client,
-                                  bson_error_t *error);
 
 mongoc_server_description_t *
 mongoc_topology_select (mongoc_topology_t *topology,
