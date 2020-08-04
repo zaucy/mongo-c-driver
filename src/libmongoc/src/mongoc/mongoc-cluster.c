@@ -55,6 +55,7 @@
 #include "mongoc-handshake-private.h"
 #include "mongoc-cluster-aws-private.h"
 #include "mongoc-error-private.h"
+#include "mongoc-connection-pool-private.h"
 
 #undef MONGOC_LOG_DOMAIN
 #define MONGOC_LOG_DOMAIN "cluster"
@@ -2127,7 +2128,10 @@ _mongoc_cluster_add_node (mongoc_cluster_t *cluster,
    mongoc_server_description_destroy (sd);
 
    bson_destroy (&speculative_auth_response);
-   mongoc_set_add (cluster->nodes, server_id, cluster_node);
+   bson_free (cluster_node->connection_address);
+   bson_free (cluster_node);
+   cluster_node = NULL;
+   //mongoc_set_add (cluster->nodes, server_id, cluster_node);
    _mongoc_host_list_destroy_all (host);
 
 #ifdef MONGOC_ENABLE_CRYPTO
@@ -2540,52 +2544,22 @@ mongoc_cluster_fetch_stream_pooled (mongoc_cluster_t *cluster,
    mongoc_server_description_t *sd;
    bool has_server_description = false;
    uint32_t generation = 0;
-
-   cluster_node =
-      (mongoc_cluster_node_t *) mongoc_set_get (cluster->nodes, server_id);
+   mongoc_connection_pool_t *connection_pool;
 
    topology = cluster->client->topology;
    bson_mutex_lock (&topology->mutex);
    sd = mongoc_topology_description_server_by_id (
       &topology->description, server_id, error);
    if (sd) {
+      /* clear connections if this is not true */
       has_server_description = true;
       generation = sd->generation;
    }
+
+   connection_pool = mongoc_set_get (topology->connection_pools, server_id);
    bson_mutex_unlock (&topology->mutex);
 
-   if (cluster_node) {
-      BSON_ASSERT (cluster_node->stream);
-
-      if (!has_server_description || cluster_node->generation < generation) {
-         /* Since the stream was created, connections to this server were
-          * invalidated.
-          * This may have happened if:
-          * - A background scan removed the server description.
-          * - A network error or a "not master"/"node is recovering" error
-          *   occurred on an app connection.
-          * - A network error occurred on the monitor connection.
-          */
-         mongoc_cluster_disconnect_node (cluster, server_id);
-      } else {
-         return _mongoc_cluster_create_server_stream (
-            topology, server_id, cluster_node->stream, error);
-      }
-   }
-
-   /* no node, or out of date */
-   if (!reconnect_ok) {
-      node_not_found (topology, server_id, error);
-      return NULL;
-   }
-
-   stream = _mongoc_cluster_add_node (cluster, generation, server_id, error);
-   if (stream) {
-      return _mongoc_cluster_create_server_stream (
-         topology, server_id, stream, error);
-   } else {
-      return NULL;
-   }
+   return mongoc_checkout_connection (connection_pool, cluster, error);
 }
 
 /*
