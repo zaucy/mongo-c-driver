@@ -21,40 +21,37 @@ mongoc_checkout_connection (mongoc_connection_pool_t *connection_pool,
    generation = connection_pool->generation;
 
 again:
-   if (connection_pool->available_connections) {
-      server_stream = _mongoc_queue_pop_head (connection_pool->queue);
-      BSON_ASSERT (server_stream);
-      connection_pool->available_connections--;
-   }
-   else if (connection_pool->total_connections < topology->max_connection_pool_size) {
-      connection_pool->total_connections++;
-      bson_mutex_unlock (&connection_pool->mutex);
-      stream = _mongoc_cluster_add_node (cluster, generation,
-                                             server_id, error);
-
-      if (!stream) {
-         bson_mutex_lock (&connection_pool->mutex);
-         connection_pool->total_connections--;
-         connection_pool->available_connections--;
+   if (!(server_stream = _mongoc_queue_pop_head (connection_pool->queue))) {
+      if (connection_pool->total_connections <
+               topology->max_connection_pool_size) {
+         connection_pool->total_connections++;
          bson_mutex_unlock (&connection_pool->mutex);
-         return NULL;
-      }
-      server_stream = _mongoc_cluster_create_server_stream (topology,
-                                                            server_id,
-                                                            stream, error);
-      server_stream->server_id = server_id;
-      server_stream->connection_pool = connection_pool;
-      bson_mutex_lock (&connection_pool->mutex);
-      server_stream->connection_id = ++connection_pool->max_id;
+         stream =
+            _mongoc_cluster_add_node (cluster, generation, server_id, error);
 
+         if (!stream) {
+            bson_mutex_lock (&connection_pool->mutex);
+            connection_pool->total_connections--;
+            bson_mutex_unlock (&connection_pool->mutex);
+            return NULL;
+         }
+         server_stream = _mongoc_cluster_create_server_stream (
+            topology, server_id, stream, error);
+         server_stream->server_id = server_id;
+         server_stream->connection_pool = connection_pool;
+         bson_mutex_lock (&connection_pool->mutex);
+         server_stream->connection_id = ++connection_pool->max_id;
+      }
+      else {
+         mongoc_cond_t new_cond;
+         mongoc_cond_init (&new_cond);
+         _mongoc_queue_push_head (connection_pool->cond_queue, &new_cond);
+         mongoc_cond_wait (&new_cond, &connection_pool->mutex);
+         goto again;
+      }
    }
-   else {
-      mongoc_cond_t new_cond;
-      mongoc_cond_init (&new_cond);
-      _mongoc_queue_push_head (connection_pool->cond_queue, &new_cond);
-      mongoc_cond_wait (&new_cond, &connection_pool->mutex);
-      goto again;
-   }
+
+
    bson_mutex_unlock (&connection_pool->mutex);
    return server_stream;
 }
@@ -65,7 +62,6 @@ mongoc_checkin_connection (mongoc_connection_pool_t *connection_pool,
 {
    mongoc_cond_t *cond;
    bson_mutex_lock (&connection_pool->mutex);
-   connection_pool->available_connections++;
    cond = _mongoc_queue_pop_tail (connection_pool->cond_queue);
    _mongoc_queue_push_head (connection_pool->queue, server_stream);
    if (cond)
