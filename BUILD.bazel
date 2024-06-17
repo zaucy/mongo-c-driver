@@ -1,0 +1,102 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+
+expand_template(
+    name = "libbson_config_header",
+    out = "src/libbson/src/bson/bson-config.h",
+    template = "src/libbson/src/bson/bson-config.h.in",
+    substitutions = select({
+        "@platforms//os:windows": {
+            "@BSON_BYTE_ORDER@": "1234",
+            "@BSON_HAVE_STDBOOL_H@": "1",
+            "@BSON_OS@": "2",
+            "@BSON_HAVE_CLOCK_GETTIME@": "0",
+            "@BSON_HAVE_STRINGS_H@": "0",
+            "@BSON_HAVE_STRNLEN@": "0",
+            "@BSON_HAVE_SNPRINTF@": "0",
+            "@BSON_HAVE_GMTIME_R@": "0",
+            "@BSON_HAVE_TIMESPEC@": "0",
+            "@BSON_EXTRA_ALIGN@": "0",
+            "@BSON_HAVE_RAND_R@": "0",
+            "@BSON_HAVE_STRLCPY@": "0",
+        },
+        "//conditions:default": {
+            "@BSON_BYTE_ORDER@": "1234",
+            "@BSON_HAVE_STDBOOL_H@": "1",
+            "@BSON_OS@": "1",
+            "@BSON_HAVE_CLOCK_GETTIME@": "1",
+            "@BSON_HAVE_STRINGS_H@": "1",
+            "@BSON_HAVE_STRNLEN@": "1",
+            "@BSON_HAVE_SNPRINTF@": "1",
+            "@BSON_HAVE_GMTIME_R@": "1",
+            "@BSON_HAVE_TIMESPEC@": "1",
+            "@BSON_EXTRA_ALIGN@": "1",
+            "@BSON_HAVE_RAND_R@": "1",
+            "@BSON_HAVE_STRLCPY@": "1",
+        },
+    }),
+)
+
+expand_template(
+    name = "libbson_version_header",
+    out = "src/libbson/src/bson/bson-version.h",
+    template = "src/libbson/src/bson/bson-version.h.in",
+    substitutions = {
+        "@libbson_VERSION_MAJOR@": module_version().split(".")[0],
+        "@libbson_VERSION_MINOR@": module_version().split(".")[1],
+        "@libbson_VERSION_PATCH@": module_version().split(".")[2],
+        "@libbson_VERSION_PRERELEASE@": "",
+        "@libbson_VERSION_VERSION_FULL@": module_version(),
+    },
+)
+
+expand_template(
+    name = "common_config_header",
+    out = "src/common/common-config.h",
+    template = "src/common/common-config.h.in",
+    substitutions = {
+        "@MONGOC_ENABLE_DEBUG_ASSERTIONS@": "0",
+    },
+)
+
+cc_library(
+    name = "libbson_headers",
+    hdrs = [":libbson_config_header", ":libbson_version_header"] + glob(["src/libbson/src/**/*.h"]),
+    defines = ["__USE_MINGW_ANSI_STDIO=1", "BSON_COMPILATION"],
+    strip_include_prefix = "src/libbson/src",
+    includes = ["src/libbson/src"],
+)
+
+cc_library(
+    name = "common",
+    strip_include_prefix = "src/common",
+    hdrs = [":common_config_header"] + glob(["src/common/*.h"]),
+    srcs = [":common_config_header"] + glob(["src/common/*.h", "src/common/*.c"]),
+    deps = [":libbson_headers"],
+)
+
+cc_library(
+    name = "libbson",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":libbson_headers",
+        ":common",
+    ],
+    srcs = [":libbson_config_header", ":libbson_version_header"] + glob([
+        "src/libbson/src/**/*.c",
+        "src/libbson/src/**/*.h",
+    ]),
+)
+
+cc_library(
+    name = "libmongoc",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":libmongoc_headers",
+        ":common",
+    ],
+    srcs = [":libmongoc_config_header", ":libmongoc_version_header"] + glob([
+        "src/libmongoc/src/**/*.c",
+        "src/libmongoc/src/**/*.h",
+    ]),
+)
